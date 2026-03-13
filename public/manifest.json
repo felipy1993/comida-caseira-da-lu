@@ -8,7 +8,7 @@
   "theme_color": "#f97316",
   "icons": [
     {
-      "src": "https://i.postimg.cc/HWtzDHC3/comidacaseiradalu.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
