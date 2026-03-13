@@ -366,6 +366,7 @@ export default function App() {
     
     setCart([...cart, { product_id: newOrder.product_id, quantity: newOrder.quantity }]);
     setNewOrder({ ...newOrder, product_id: '', quantity: 1 });
+    showToast('Item adicionado ao carrinho!');
   };
 
   const removeFromCart = (index: number) => {
@@ -406,6 +407,7 @@ export default function App() {
     if (!newExpense.description || !newExpense.value) return;
 
     try {
+      setLoading(true);
       await addDoc(collection(db, 'expenses'), {
         ...newExpense,
         value: parseFloat(newExpense.value),
@@ -413,9 +415,13 @@ export default function App() {
       });
       logActivity('CREATE_EXPENSE', `Gasto criado: ${newExpense.description}`);
       setNewExpense({ description: '', value: '' });
+      showToast('Gasto registrado com sucesso!');
       fetchData();
     } catch (error) {
       console.error('Error adding expense:', error);
+      showToast('Erro ao registrar gasto.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -424,6 +430,7 @@ export default function App() {
     if (!newCustomer.name) return;
 
     try {
+      setLoading(true);
       const docRef = await addDoc(collection(db, 'customers'), newCustomer);
       const customer = { id: docRef.id, ...newCustomer };
       setCustomers([...customers, customer]);
@@ -431,8 +438,12 @@ export default function App() {
       setNewCustomer({ name: '', phone: '', observation: '' });
       setShowCustomerModal(false);
       logActivity('CREATE_CUSTOMER', `Cliente criado: ${newCustomer.name}`);
+      showToast('Cliente cadastrado com sucesso!');
     } catch (error) {
       console.error('Error adding customer:', error);
+      showToast('Erro ao cadastrar cliente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -441,15 +452,20 @@ export default function App() {
     if (!newProduct.name || !newProduct.price) return;
 
     try {
+      setLoading(true);
       await addDoc(collection(db, 'products'), {
         ...newProduct,
         price: parseFloat(newProduct.price)
       });
       setNewProduct({ name: '', price: '', is_shortcut: true });
-      fetchData();
       logActivity('CREATE_PRODUCT', `Produto criado: ${newProduct.name}`);
+      showToast('Produto cadastrado com sucesso!');
+      fetchData();
     } catch (error) {
       console.error('Error adding product:', error);
+      showToast('Erro ao cadastrar produto.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -457,13 +473,17 @@ export default function App() {
     if (!deleteConfirmation) return;
     const { type, id } = deleteConfirmation;
     try {
+      setLoading(true);
       await deleteDoc(doc(db, type, id.toString()));
       logActivity('DELETE_' + type.toUpperCase(), `Item excluído: ${deleteConfirmation.label}`);
       setDeleteConfirmation(null);
+      showToast('Item excluído com sucesso!');
       fetchData();
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
       showToast('Erro ao excluir do banco de dados.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -477,14 +497,18 @@ export default function App() {
 
     const { type, data } = editingItem;
     try {
+      setLoading(true);
       const { id, ...updateData } = data;
       await updateDoc(doc(db, type, id.toString()), updateData);
       logActivity('UPDATE_' + type.toUpperCase(), `Item atualizado: ${id}`);
       setEditingItem(null);
+      showToast('Atualizado com sucesso!');
       fetchData();
     } catch (error) {
       console.error(`Error updating ${type}:`, error);
       showToast('Erro ao atualizar na nuvem.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -856,9 +880,10 @@ export default function App() {
               <button 
                 type="button"
                 onClick={addToCart}
-                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 flex items-center gap-2"
+                disabled={loading}
+                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 flex items-center gap-2 disabled:opacity-50"
               >
-                <PlusCircle size={20} /> Adicionar
+                {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <PlusCircle size={20} />} Adicionar
               </button>
             </div>
           </div>
@@ -927,9 +952,10 @@ export default function App() {
           <button 
             type="button"
             onClick={() => handleAddOrder()}
-            disabled={(!newOrder.product_id && cart.length === 0) || !newOrder.customer_id}
-            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+            disabled={loading || ((!newOrder.product_id && cart.length === 0) || !newOrder.customer_id)}
+            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 flex items-center justify-center gap-3"
           >
+            {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             {cart.length > 0 
               ? `Finalizar Pedido (${cart.length + (newOrder.product_id ? 1 : 0)} itens)` 
               : 'Finalizar Pedido'
@@ -1197,9 +1223,11 @@ export default function App() {
           </div>
           <button 
             type="submit"
-            className="w-full bg-rose-600 text-white py-3 rounded-xl font-semibold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200"
+            disabled={loading}
+            className="w-full bg-rose-600 text-white py-3 rounded-xl font-semibold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Registrar Gasto
+            {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {loading ? 'Processando...' : 'Registrar Gasto'}
           </button>
         </form>
       </div>
@@ -1445,9 +1473,11 @@ export default function App() {
             </label>
             <button 
               type="submit"
-              className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100"
+              disabled={loading}
+              className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Adicionar
+              {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {loading ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
         </form>
@@ -1855,9 +1885,11 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow-lg shadow-indigo-200"
+                  disabled={loading}
+                  className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Salvar
+                  {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {loading ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -2025,9 +2057,11 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow-lg shadow-indigo-200"
+                  disabled={loading}
+                  className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Salvar
+                  {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {loading ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -2059,9 +2093,11 @@ export default function App() {
               </button>
               <button 
                 onClick={handleDelete}
-                className="flex-1 px-4 py-3 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200"
+                disabled={loading}
+                className="flex-1 px-4 py-3 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Excluir
+                {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {loading ? 'Excluindo...' : 'Excluir'}
               </button>
             </div>
           </motion.div>
