@@ -25,6 +25,7 @@ ui-debug.log*
 marmita.db
 marmita.db-journal
 marmita.db-wal
+marmita.db-shm
 
 # IDE / OS
 .DS_Store

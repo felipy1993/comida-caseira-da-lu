@@ -27,7 +27,8 @@ import {
   Users,
   CalendarDays,
   CheckCircle2,
-  Circle
+  Circle,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -45,9 +46,14 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth } from './lib/firebase';
+import Login from './components/Login';
 import { Customer, Product, Order, Expense, Stats, ActivityLog } from './types';
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState<Stats | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -93,8 +99,18 @@ export default function App() {
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [activeTab, user]);
 
   useEffect(() => {
     if (activeTab === 'monthly-report') {
@@ -403,6 +419,13 @@ export default function App() {
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
           Backend Online
         </div>
+        <button 
+          onClick={() => signOut(auth)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-slate-600 rounded-xl text-xs font-bold uppercase tracking-wider border border-slate-200 hover:bg-slate-50 transition-colors"
+        >
+          <LogIn size={14} className="rotate-180" />
+          Sair
+        </button>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div 
@@ -1583,12 +1606,29 @@ export default function App() {
     </div>
   );
 
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLoginSuccess={() => {}} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-24 lg:pb-0 lg:pl-64">
       {/* Sidebar Desktop */}
       <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 fixed h-full left-0 top-0 z-20">
-        <div className="p-6">
-          <h1 className="text-2xl font-black text-indigo-600 tracking-tight leading-tight">COMIDA CASEIRA<br/>DA LU</h1>
+        <div className="p-8 flex flex-col items-center">
+          <img 
+            src="https://i.postimg.cc/HWtzDHC3/comidacaseiradalu.png" 
+            alt="Logo" 
+            className="w-40 h-40 object-contain mb-4 drop-shadow-lg"
+          />
+          <h1 className="text-xl font-black text-slate-800 tracking-tight leading-tight text-center">COMIDA CASEIRA<br/>DA LU</h1>
         </div>
         <nav className="flex-1 px-4 space-y-2">
           <NavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Dashboard" />
@@ -1607,9 +1647,16 @@ export default function App() {
       </aside>
 
       {/* Header Mobile */}
-      <header className="lg:hidden bg-white border-b border-slate-200 p-4 sticky top-0 z-20 flex justify-between items-center">
-        <h1 className="text-xl font-black text-indigo-600 tracking-tight">COMIDA CASEIRA DA LU</h1>
-        <div className="text-xs font-bold text-slate-400">{new Date().toLocaleDateString('pt-BR')}</div>
+      <header className="lg:hidden bg-white border-b border-slate-200 p-2 sticky top-0 z-20 flex justify-between items-center px-4">
+        <div className="flex items-center gap-2">
+          <img 
+            src="https://i.postimg.cc/HWtzDHC3/comidacaseiradalu.png" 
+            alt="Logo" 
+            className="w-14 h-14 object-contain"
+          />
+          <h1 className="text-base font-black text-slate-800 tracking-tight uppercase">Comida Caseira da Lu</h1>
+        </div>
+        <div className="text-[10px] font-bold text-slate-400">{new Date().toLocaleDateString('pt-BR')}</div>
       </header>
 
       {/* Main Content */}
