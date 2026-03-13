@@ -1,8 +1,41 @@
+# Dependencies
 node_modules/
-build/
-dist/
+.pnp
+.pnp.js
+
+# Testing
 coverage/
+
+# Production
+dist/
+dist-ssr/
+build/
+*.local
+
+# Firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Vercel
+.vercel
+
+# Database
+marmita.db
+marmita.db-journal
+marmita.db-wal
+
+# IDE / OS
 .DS_Store
 *.log
-.env*
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
