@@ -1,22 +1,22 @@
 export interface Customer {
-  id: number;
+  id: string | number;
   name: string;
   phone?: string;
   observation?: string;
 }
 
 export interface Product {
-  id: number;
+  id: string | number;
   name: string;
   price: number;
   is_shortcut?: number;
 }
 
 export interface Order {
-  id: number;
-  customer_id: number;
+  id: string | number;
+  customer_id: string | number;
   customer_name?: string;
-  product_id: number;
+  product_id: string | number;
   product_name?: string;
   quantity: number;
   total_value: number;
@@ -27,7 +27,7 @@ export interface Order {
 }
 
 export interface Expense {
-  id: number;
+  id: string | number;
   description: string;
   value: number;
   date: string;
@@ -42,7 +42,7 @@ export interface Stats {
 }
 
 export interface ActivityLog {
-  id: number;
+  id: string | number;
   action: string;
   details: string;
   timestamp: string;

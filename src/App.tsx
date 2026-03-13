@@ -46,8 +46,22 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy, 
+  updateDoc, 
+  doc, 
+  deleteDoc, 
+  limit, 
+  serverTimestamp,
+  increment
+} from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth } from './lib/firebase';
+import { auth, db } from './lib/firebase';
 import Login from './components/Login';
 import { Customer, Product, Order, Expense, Stats, ActivityLog } from './types';
 
@@ -98,30 +112,53 @@ export default function App() {
 
   const today = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthChecking(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchData();
+  const logActivity = async (action: string, details: string) => {
+    try {
+      await addDoc(collection(db, 'activity_logs'), {
+        action,
+        details,
+        timestamp: serverTimestamp()
+      });
+      fetchLogs();
+    } catch (err) {
+      console.error('Failed to log activity:', err);
     }
-  }, [activeTab, user]);
+  };
 
-  useEffect(() => {
-    if (activeTab === 'monthly-report') {
-      fetchMonthlyData();
+  const fetchLogs = async () => {
+    try {
+      const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50));
+      const querySnapshot = await getDocs(q);
+      const logsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      setLogs(logsData);
+    } catch (error) {
+      console.error('Error fetching logs:', error);
     }
-  }, [activeTab, selectedMonth]);
+  };
 
   const fetchMonthlyData = async () => {
+    // Basic aggregation for monthly report
     try {
-      const res = await fetch(`/api/stats/monthly?month=${selectedMonth}`);
-      setMonthlyStats(await res.json());
+      const q = query(collection(db, 'orders'), where('date', '>=', `${selectedMonth}-01`), where('date', '<=', `${selectedMonth}-31`));
+      const querySnapshot = await getDocs(q);
+      let revenue = 0;
+      querySnapshot.docs.forEach(doc => revenue += doc.data().total_value);
+
+      const eq = query(collection(db, 'expenses'), where('date', '>=', `${selectedMonth}-01`), where('date', '<=', `${selectedMonth}-31`));
+      const eqSnapshot = await getDocs(eq);
+      let expensesVal = 0;
+      eqSnapshot.docs.forEach(doc => expensesVal += doc.data().value);
+
+      setMonthlyStats({
+        revenue,
+        expenses: expensesVal,
+        profit: revenue - expensesVal,
+        topProducts: [], // Simplified for now
+        topCustomers: [] // Simplified for now
+      });
     } catch (error) {
       console.error('Error fetching monthly stats:', error);
     }
@@ -130,26 +167,80 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const fetchOptions = { cache: 'no-store' as RequestCache };
-      const [statsRes, ordersRes, expensesRes, productsRes, customersRes, logsRes, trendsRes] = await Promise.all([
-        fetch(`/api/stats?date=${today}`, fetchOptions),
-        fetch(`/api/orders?date=${today}`, fetchOptions),
-        fetch(`/api/expenses?date=${today}`, fetchOptions),
-        fetch('/api/products', fetchOptions),
-        fetch('/api/customers', fetchOptions),
-        fetch('/api/logs', fetchOptions),
-        fetch('/api/stats/trends', fetchOptions)
-      ]);
+      // 1. Fetch Products
+      const productsSnapshot = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
+      const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      
+      // Seed initial products if empty
+      if (productsData.length === 0) {
+        const initialProducts = [
+          { name: 'Marmita Pequena', price: 15.00, is_shortcut: 1 },
+          { name: 'Marmita Média', price: 18.00, is_shortcut: 1 },
+          { name: 'Marmita Grande', price: 22.00, is_shortcut: 1 },
+          { name: 'Suco de Laranja 300ml', price: 7.00, is_shortcut: 1 },
+          { name: 'Suco de Limão 300ml', price: 6.00, is_shortcut: 1 },
+          { name: 'Refrigerante Lata', price: 6.00, is_shortcut: 1 },
+        ];
+        for (const p of initialProducts) {
+          await addDoc(collection(db, 'products'), p);
+        }
+        const refreshedProducts = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
+        setProducts(refreshedProducts.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[]);
+      } else {
+        setProducts(productsData);
+      }
 
-      setStats(await statsRes.json());
-      setOrders(await ordersRes.json());
-      setExpenses(await expensesRes.json());
-      setProducts(await productsRes.json());
-      setCustomers(await customersRes.json());
-      setLogs(await logsRes.json());
-      setTrends(await trendsRes.json());
+      // 2. Fetch Customers
+      const customersSnapshot = await getDocs(query(collection(db, 'customers'), orderBy('name', 'asc')));
+      const customersData = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
+      
+      // Seed default customer if empty
+      if (customersData.length === 0) {
+        const docRef = await addDoc(collection(db, 'customers'), { name: 'Consumidor Final' });
+        setCustomers([{ id: docRef.id, name: 'Consumidor Final' }]);
+      } else {
+        setCustomers(customersData);
+      }
+
+      // 3. Fetch Today's Orders
+      const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('date', '==', today)));
+      const ordersData = ordersSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const customer = customersData.find(c => c.id === data.customer_id);
+        const product = productsData.find(p => p.id === data.product_id);
+        return { 
+          id: doc.id, 
+          ...data,
+          customer_name: customer?.name || 'Desconhecido',
+          product_name: product?.name || 'Deletado'
+        };
+      }) as Order[];
+      setOrders(ordersData);
+
+      // 4. Fetch Today's Expenses
+      const expensesSnapshot = await getDocs(query(collection(db, 'expenses'), where('date', '==', today)));
+      const expensesData = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Expense[];
+      setExpenses(expensesData);
+
+      // 5. Calculate Stats
+      const totalSales = ordersData.reduce((acc, o) => acc + o.total_value, 0);
+      const totalExpenses = expensesData.reduce((acc, e) => acc + e.value, 0);
+      const totalMarmitas = ordersData.reduce((acc, o) => acc + o.quantity, 0);
+      setStats({
+        totalSales,
+        totalOrders: ordersData.length,
+        totalMarmitas,
+        totalExpenses,
+        profit: totalSales - totalExpenses
+      });
+
+      // 6. Fetch Logs & Trends (Trends simplified for now)
+      fetchLogs();
+      setTrends([]); 
+      
     } catch (error) {
       console.error('Error fetching data:', error);
+      showToast('Erro ao carregar dados da nuvem.');
     } finally {
       setLoading(false);
     }
@@ -203,26 +294,24 @@ export default function App() {
       setLoading(true);
       // Submit each item
       for (const item of itemsToSubmit) {
-        const product = products.find(p => p.id === parseInt(item.product_id));
+        const product = products.find(p => p.id === item.product_id);
         if (!product) continue;
         
         const total_value = product.price * item.quantity;
         
-        await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: parseInt(newOrder.customer_id),
-            product_id: parseInt(item.product_id),
-            quantity: item.quantity,
-            total_value,
-            date: today,
-            time: newOrder.time,
-            observation: newOrder.observation
-          })
+        await addDoc(collection(db, 'orders'), {
+          customer_id: newOrder.customer_id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          total_value,
+          date: today,
+          time: newOrder.time,
+          observation: newOrder.observation,
+          status: 'pending'
         });
       }
       
+      logActivity('CREATE_ORDER', `Pedido finalizado: ${itemsToSubmit.length} itens`);
       setCart([]);
       setNewOrder({
         customer_id: '',
@@ -256,9 +345,13 @@ export default function App() {
     setCart(cart.filter((_, i) => i !== index));
   };
 
-  const toggleShortcut = async (productId: number) => {
+  const toggleShortcut = async (productId: string | number) => {
     try {
-      await fetch(`/api/products/toggle-shortcut/${productId}`, { method: 'POST' });
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      await updateDoc(doc(db, 'products', productId.toString()), {
+        is_shortcut: product.is_shortcut === 1 ? 0 : 1
+      });
       await fetchData();
     } catch (error) {
       console.error('Error toggling shortcut:', error);
@@ -286,15 +379,12 @@ export default function App() {
     if (!newExpense.description || !newExpense.value) return;
 
     try {
-      await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newExpense,
-          value: parseFloat(newExpense.value),
-          date: today
-        })
+      await addDoc(collection(db, 'expenses'), {
+        ...newExpense,
+        value: parseFloat(newExpense.value),
+        date: today
       });
+      logActivity('CREATE_EXPENSE', `Gasto criado: ${newExpense.description}`);
       setNewExpense({ description: '', value: '' });
       fetchData();
     } catch (error) {
@@ -307,16 +397,13 @@ export default function App() {
     if (!newCustomer.name) return;
 
     try {
-      const res = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCustomer)
-      });
-      const customer = await res.json();
+      const docRef = await addDoc(collection(db, 'customers'), newCustomer);
+      const customer = { id: docRef.id, ...newCustomer };
       setCustomers([...customers, customer]);
-      setNewOrder({ ...newOrder, customer_id: customer.id.toString() });
+      setNewOrder({ ...newOrder, customer_id: docRef.id });
       setNewCustomer({ name: '', phone: '', observation: '' });
       setShowCustomerModal(false);
+      logActivity('CREATE_CUSTOMER', `Cliente criado: ${newCustomer.name}`);
     } catch (error) {
       console.error('Error adding customer:', error);
     }
@@ -327,16 +414,13 @@ export default function App() {
     if (!newProduct.name || !newProduct.price) return;
 
     try {
-      await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newProduct,
-          price: parseFloat(newProduct.price)
-        })
+      await addDoc(collection(db, 'products'), {
+        ...newProduct,
+        price: parseFloat(newProduct.price)
       });
       setNewProduct({ name: '', price: '', is_shortcut: true });
       fetchData();
+      logActivity('CREATE_PRODUCT', `Produto criado: ${newProduct.name}`);
     } catch (error) {
       console.error('Error adding product:', error);
     }
@@ -346,18 +430,13 @@ export default function App() {
     if (!deleteConfirmation) return;
     const { type, id } = deleteConfirmation;
     try {
-      const res = await fetch(`/api/${type}/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Erro ao excluir. Verifique se há itens vinculados.');
-        setDeleteConfirmation(null);
-        return;
-      }
+      await deleteDoc(doc(db, type, id.toString()));
+      logActivity('DELETE_' + type.toUpperCase(), `Item excluído: ${deleteConfirmation.label}`);
       setDeleteConfirmation(null);
       fetchData();
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
-      showToast('Erro de conexão ao excluir.');
+      showToast('Erro ao excluir do banco de dados.');
     }
   };
 
@@ -371,15 +450,14 @@ export default function App() {
 
     const { type, data } = editingItem;
     try {
-      await fetch(`/api/${type}/${data.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const { id, ...updateData } = data;
+      await updateDoc(doc(db, type, id.toString()), updateData);
+      logActivity('UPDATE_' + type.toUpperCase(), `Item atualizado: ${id}`);
       setEditingItem(null);
       fetchData();
     } catch (error) {
       console.error(`Error updating ${type}:`, error);
+      showToast('Erro ao atualizar na nuvem.');
     }
   };
 
@@ -907,22 +985,16 @@ export default function App() {
     printWindow.document.close();
   };
 
-  const toggleOrderStatus = async (orderId: number, currentStatus: string) => {
+  const toggleOrderStatus = async (orderId: string | number, currentStatus: string) => {
     try {
       const newStatus = currentStatus === 'delivered' ? 'pending' : 'delivered';
-      const res = await fetch(`/api/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+      await updateDoc(doc(db, 'orders', orderId.toString()), {
+        status: newStatus
       });
-      if (res.ok) {
-        fetchData();
-      } else {
-        showToast('Erro ao atualizar status do pedido.');
-      }
+      fetchData();
     } catch (error) {
       console.error('Error toggling order status:', error);
-      showToast('Erro de conexão.');
+      showToast('Erro ao atualizar status.');
     }
   };
 
