@@ -227,17 +227,22 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </form>
         </div>
 
-        {/* Footer info */}
+        {/* Developer Footer */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="text-center mt-12 space-y-2"
+          className="text-center mt-12 flex flex-col items-center gap-3"
         >
-          <p className="text-slate-500 text-sm font-medium">
-            Segurança de ponta garantida pelo <span className="text-slate-300">Firebase</span>
-          </p>
-          <div className="w-8 h-1 bg-orange-500/20 mx-auto rounded-full" />
+          <div className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Desenvolvido por</span>
+            <img 
+              src="https://i.postimg.cc/5N7ptFSk/logo-dev.png" 
+              alt="Developer Logo" 
+              className="h-6 object-contain"
+            />
+          </div>
+          <div className="w-8 h-1 bg-orange-500/20 rounded-full" />
         </motion.div>
       </motion.div>
     </div>

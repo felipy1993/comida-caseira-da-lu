@@ -1752,6 +1752,16 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+      
+      {/* Developer Footer Main */}
+      <footer className="pb-28 lg:pb-8 pt-4 px-4 text-center flex flex-col items-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
+        <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Sistema desenvolvido por</span>
+        <img 
+          src="https://i.postimg.cc/5N7ptFSk/logo-dev.png" 
+          alt="Developer Logo" 
+          className="h-5 object-contain grayscale hover:grayscale-0 transition-all"
+        />
+      </footer>
 
       {/* Bottom Nav Mobile */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-start sm:justify-around p-2 z-20 overflow-x-auto scrollbar-hide">
