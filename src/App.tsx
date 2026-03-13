@@ -99,7 +99,7 @@ export default function App() {
   const [newProduct, setNewProduct] = useState({ name: '', price: '', is_shortcut: true });
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState<{ type: string, id: number, label: string } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ type: string, id: string, label: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
@@ -111,6 +111,26 @@ export default function App() {
   };
 
   const today = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [activeTab, user]);
+
+  useEffect(() => {
+    if (activeTab === 'monthly-report') {
+      fetchMonthlyData();
+    }
+  }, [activeTab, selectedMonth]);
 
   const logActivity = async (action: string, details: string) => {
     try {
@@ -440,7 +460,7 @@ export default function App() {
     }
   };
 
-  const confirmDelete = (type: string, id: number, label: string) => {
+  const confirmDelete = (type: string, id: string, label: string) => {
     setDeleteConfirmation({ type, id, label });
   };
 
