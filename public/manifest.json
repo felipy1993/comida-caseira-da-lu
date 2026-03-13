@@ -1,0 +1,17 @@
+{
+  "name": "Comida Caseira da Lu",
+  "short_name": "Caseira da Lu",
+  "description": "Sistema de Gestão - Comida Caseira da Lu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/HWtzDHC3/comidacaseiradalu.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
