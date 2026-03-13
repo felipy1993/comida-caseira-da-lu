@@ -275,21 +275,28 @@ export default function App() {
       const total_value = product.price * (quickOrderData.quantity || 1);
       
       try {
-        await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...quickOrderData,
-            total_value,
-            date: today,
-            time: quickOrderData.time || getCurrentTime()
-          })
+        setLoading(true);
+        await addDoc(collection(db, 'orders'), {
+          customer_id: quickOrderData.customer_id,
+          product_id: quickOrderData.product_id,
+          quantity: quickOrderData.quantity || 1,
+          total_value,
+          date: today,
+          time: quickOrderData.time || getCurrentTime(),
+          observation: quickOrderData.observation || '',
+          status: 'pending'
         });
+        
+        logActivity('CREATE_ORDER', `Venda rápida: ${product.name}`);
+        showToast('Venda realizada com sucesso!');
         fetchData();
         return;
       } catch (error) {
         console.error('Error adding quick order:', error);
+        showToast('Erro ao realizar venda rápida.');
         return;
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -607,7 +614,7 @@ export default function App() {
             </div>
           </div>
           <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={trends}>
                 <defs>
                   <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
