@@ -64,6 +64,8 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from './lib/firebase';
 import Login from './components/Login';
 import { Customer, Product, Order, Expense, Stats, ActivityLog } from './types';
+import { formatCurrency, getCurrentTime, today } from './utils';
+import { NavItem, MobileNavItem } from './components/Navigation';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -81,10 +83,6 @@ export default function App() {
   const [monthlyStats, setMonthlyStats] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
-  const getCurrentTime = () => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  };
 
   // Form states
   const [newOrder, setNewOrder] = useState({
@@ -111,7 +109,6 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -537,9 +534,6 @@ export default function App() {
     link.click();
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
 
   const renderDashboard = () => (
     <div className="space-y-6">
@@ -946,7 +940,7 @@ export default function App() {
               rows={2}
               placeholder="Ex: Sem salada, entregar 11:30"
               value={newOrder.observation}
-              onChange={e => setNewOrder({ ...newOrder, observation: e.target.value })}
+              onChange={e => setNewOrder({ ...newOrder, observation: e.target.value.toUpperCase() })}
             />
           </div>
 
@@ -1203,10 +1197,11 @@ export default function App() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
             <input 
               type="text" 
+              list="expenses-descriptions"
               className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
               placeholder="Ex: Arroz, Feijão, Carne..."
               value={newExpense.description}
-              onChange={e => setNewExpense({ ...newExpense, description: e.target.value })}
+              onChange={e => setNewExpense({ ...newExpense, description: e.target.value.toUpperCase() })}
               required
             />
           </div>
@@ -1443,10 +1438,11 @@ export default function App() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Produto</label>
             <input 
               type="text" 
+              list="products-names"
               className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
               placeholder="Ex: Coca-Cola, Água, Cerveja..."
               value={newProduct.name}
-              onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+              onChange={e => setNewProduct({ ...newProduct, name: e.target.value.toUpperCase() })}
               required
             />
           </div>
@@ -1852,9 +1848,10 @@ export default function App() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
                 <input 
                   type="text" 
+                  list="customers-names"
                   className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                   value={newCustomer.name}
-                  onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value.toUpperCase() })}
                   required
                 />
               </div>
@@ -1873,7 +1870,7 @@ export default function App() {
                   className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                   rows={2}
                   value={newCustomer.observation}
-                  onChange={e => setNewCustomer({ ...newCustomer, observation: e.target.value })}
+                  onChange={e => setNewCustomer({ ...newCustomer, observation: e.target.value.toUpperCase() })}
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -1922,9 +1919,10 @@ export default function App() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
                     <input 
                       type="text" 
+                      list="products-names"
                       className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                       value={editingItem.data.name}
-                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, name: e.target.value } })}
+                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, name: e.target.value.toUpperCase() } })}
                       required
                     />
                   </div>
@@ -1980,7 +1978,7 @@ export default function App() {
                       className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                       rows={2}
                       value={editingItem.data.observation || ''}
-                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, observation: e.target.value } })}
+                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, observation: e.target.value.toUpperCase() } })}
                     />
                   </div>
                 </>
@@ -1992,9 +1990,10 @@ export default function App() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
                     <input 
                       type="text" 
+                      list="expenses-descriptions"
                       className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                       value={editingItem.data.description}
-                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, description: e.target.value } })}
+                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, description: e.target.value.toUpperCase() } })}
                       required
                     />
                   </div>
@@ -2021,9 +2020,10 @@ export default function App() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
                     <input 
                       type="text" 
+                      list="customers-names"
                       className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                       value={editingItem.data.name}
-                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, name: e.target.value } })}
+                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, name: e.target.value.toUpperCase() } })}
                       required
                     />
                   </div>
@@ -2042,7 +2042,7 @@ export default function App() {
                       className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                       rows={2}
                       value={editingItem.data.observation || ''}
-                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, observation: e.target.value } })}
+                      onChange={e => setEditingItem({ ...editingItem, data: { ...editingItem.data, observation: e.target.value.toUpperCase() } })}
                     />
                   </div>
                 </>
@@ -2117,37 +2117,19 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Hidden DataLists for AutoComplete */}
+      <datalist id="customers-names">
+        {customers.map(c => <option key={`dl-c-${c.id}`} value={c.name} />)}
+      </datalist>
+      <datalist id="products-names">
+        {products.map(p => <option key={`dl-p-${p.id}`} value={p.name} />)}
+      </datalist>
+      <datalist id="expenses-descriptions">
+        {Array.from(new Set(expenses.map(e => e.description))).map((desc, idx) => (
+          <option key={`dl-e-${idx}`} value={desc} />
+        ))}
+      </datalist>
     </div>
   );
 }
 
-function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-        active 
-          ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-sm' 
-          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-      {active && <ChevronRight size={16} className="ml-auto" />}
-    </button>
-  );
-}
-
-function MobileNavItem({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`flex flex-col items-center gap-1 flex-1 min-w-[64px] py-1 transition-colors ${
-        active ? 'text-indigo-600' : 'text-slate-400'
-      }`}
-    >
-      {icon}
-      <span className="text-[10px] font-medium uppercase tracking-tighter">{label}</span>
-    </button>
-  );
-}
