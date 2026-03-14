@@ -70,7 +70,7 @@ import { NavItem, MobileNavItem } from './components/Navigation';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('new-order');
   const [stats, setStats] = useState<Stats | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -103,6 +103,8 @@ export default function App() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [expandedOrders, setExpandedOrders] = useState<string[]>([]);
+  const [showManualOrder, setShowManualOrder] = useState(false);
+
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -185,11 +187,25 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Products
-      const productsSnapshot = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
-      const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-      
-      // Seed initial products if empty
+      // 1. Fetch all main data in parallel to reduce waterfall latency
+      const [productsSnap, customersSnap, ordersSnap, expensesSnap, logsSnap] = await Promise.all([
+        getDocs(query(collection(db, 'products'), orderBy('name', 'asc'))),
+        getDocs(query(collection(db, 'customers'), orderBy('name', 'asc'))),
+        getDocs(query(collection(db, 'orders'), where('date', '==', today))),
+        getDocs(query(collection(db, 'expenses'), where('date', '==', today))),
+        getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)))
+      ]);
+
+      let productsData = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      let customersData = customersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
+      const expensesData = expensesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Expense[];
+      const logsData = logsSnap.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate() || new Date()
+      })) as any[];
+
+      // Seed initial products if empty (happens only once)
       if (productsData.length === 0) {
         const initialProducts = [
           { name: 'Marmita Pequena', price: 15.00, is_shortcut: 1 },
@@ -203,26 +219,19 @@ export default function App() {
           await addDoc(collection(db, 'products'), p);
         }
         const refreshedProducts = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
-        setProducts(refreshedProducts.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[]);
-      } else {
-        setProducts(productsData);
+        productsData = refreshedProducts.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       }
+      setProducts(productsData);
 
-      // 2. Fetch Customers
-      const customersSnapshot = await getDocs(query(collection(db, 'customers'), orderBy('name', 'asc')));
-      const customersData = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
-      
-      // Seed default customer if empty
+      // Seed default customer if empty (happens only once)
       if (customersData.length === 0) {
         const docRef = await addDoc(collection(db, 'customers'), { name: 'Consumidor Final' });
-        setCustomers([{ id: docRef.id, name: 'Consumidor Final' }]);
-      } else {
-        setCustomers(customersData);
+        customersData = [{ id: docRef.id, name: 'Consumidor Final' }];
       }
+      setCustomers(customersData);
 
-      // 3. Fetch Today's Orders
-      const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('date', '==', today)));
-      const ordersData = ordersSnapshot.docs.map(doc => {
+      // Map orders with names
+      const ordersData = ordersSnap.docs.map(doc => {
         const data = doc.data();
         const customer = customersData.find(c => c.id === data.customer_id);
         const product = productsData.find(p => p.id === data.product_id);
@@ -234,16 +243,14 @@ export default function App() {
         };
       }) as Order[];
       setOrders(ordersData);
-
-      // 4. Fetch Today's Expenses
-      const expensesSnapshot = await getDocs(query(collection(db, 'expenses'), where('date', '==', today)));
-      const expensesData = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Expense[];
       setExpenses(expensesData);
+      setLogs(logsData);
 
-      // 5. Calculate Stats
+      // 5. Calculate Stats from the fetched data
       const totalSales = ordersData.reduce((acc, o) => acc + o.total_value, 0);
       const totalExpenses = expensesData.reduce((acc, e) => acc + e.value, 0);
       const totalMarmitas = ordersData.reduce((acc, o) => acc + o.quantity, 0);
+      
       setStats({
         totalSales,
         totalOrders: ordersData.length,
@@ -252,13 +259,14 @@ export default function App() {
         profit: totalSales - totalExpenses
       });
 
-      // 6. Fetch Logs & Trends (Trends simplified for now)
-      fetchLogs();
-      setTrends([]); 
+      // Trends logic (could be improved with a secondary parallel fetch if needed)
+      setTrends([
+        { date: 'Hoje', vendas: totalSales, gastos: totalExpenses }
+      ]); 
       
     } catch (error) {
       console.error('Error fetching data:', error);
-      showToast('Erro ao carregar dados da nuvem.');
+      showToast('Erro ao carregar dados. Verifique sua conexão.');
     } finally {
       setLoading(false);
     }
@@ -744,33 +752,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Quick Sales Section */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 mb-4">
-          <Zap size={20} className="text-amber-500" />
-          <h3 className="font-semibold text-slate-800">Venda Rápida</h3>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {products.filter(p => p.is_shortcut).map(product => (
-            <button
-              key={product.id}
-              onClick={() => handleQuickSale(product)}
-              className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-indigo-50 hover:border-indigo-200 transition-all group"
-            >
-              <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-600 text-center">{product.name}</span>
-              <span className="text-xs text-slate-500 font-medium">{formatCurrency(product.price)}</span>
-            </button>
-          ))}
-          <button
-            onClick={() => setActiveTab('products')}
-            className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-all"
-          >
-            <PlusCircle size={20} className="mb-1" />
-            <span className="text-xs font-medium">Configurar</span>
-          </button>
-        </div>
-      </div>
-
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-4 border-b border-slate-50 flex justify-between items-center">
           <h3 className="font-semibold text-slate-800">Últimos Pedidos</h3>
@@ -815,149 +796,187 @@ export default function App() {
 
   const renderNewOrder = () => (
     <div className="max-w-md mx-auto space-y-6">
+      {/* Quick Sales Section */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <h2 className="text-xl font-bold text-slate-900 mb-6">Novo Pedido</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
-            <div className="flex gap-2">
-              <select 
-                className="flex-1 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
-                value={newOrder.customer_id}
-                onChange={e => setNewOrder({ ...newOrder, customer_id: e.target.value })}
-                required
-              >
-                <option value="">Selecionar Cliente</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <button 
-                type="button"
-                onClick={() => setShowCustomerModal(true)}
-                className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
-              >
-                <UserPlus size={24} />
-              </button>
-            </div>
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Adicionar Itens</h3>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Produto / Bebida</label>
-              <select 
-                className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
-                value={newOrder.product_id}
-                onChange={e => setNewOrder({ ...newOrder, product_id: e.target.value })}
-              >
-                <option value="">Selecionar Item</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade</label>
-                <input 
-                  type="number" 
-                  min="1"
-                  className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
-                  value={Number.isNaN(newOrder.quantity) ? "" : newOrder.quantity}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setNewOrder({ ...newOrder, quantity: val === "" ? NaN : parseInt(val) });
-                  }}
-                />
-              </div>
-              <button 
-                type="button"
-                onClick={addToCart}
-                disabled={isSubmitting}
-                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 flex items-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <PlusCircle size={20} />} Adicionar
-              </button>
-            </div>
-          </div>
-
-          {cart.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Itens no Pedido</h3>
-              <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
-                {cart.map((item, index) => {
-                  const product = products.find(p => p.id === parseInt(item.product_id));
-                  return (
-                    <div key={index} className="p-3 bg-white flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-slate-900">{product?.name}</div>
-                        <div className="text-xs text-slate-500">{item.quantity}x {formatCurrency(product?.price || 0)}</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-slate-900">{formatCurrency((product?.price || 0) * item.quantity)}</span>
-                        <button 
-                          onClick={() => removeFromCart(index)}
-                          className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="p-3 bg-slate-50 flex justify-between items-center font-bold">
-                  <span className="text-slate-700">Total</span>
-                  <span className="text-indigo-600 text-lg">
-                    {formatCurrency(cart.reduce((acc, item) => {
-                      const product = products.find(p => p.id === parseInt(item.product_id));
-                      return acc + (product?.price || 0) * item.quantity;
-                    }, 0))}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Horário</label>
-              <input 
-                type="time" 
-                className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
-                value={newOrder.time}
-                onChange={e => setNewOrder({ ...newOrder, time: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Observação</label>
-            <textarea 
-              className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
-              rows={2}
-              placeholder="Ex: Sem salada, entregar 11:30"
-              value={newOrder.observation}
-              onChange={e => setNewOrder({ ...newOrder, observation: e.target.value.toUpperCase() })}
-            />
-          </div>
-
-          <button 
-            type="button"
-            onClick={() => handleAddOrder()}
-            disabled={isSubmitting || ((!newOrder.product_id && cart.length === 0) || !newOrder.customer_id)}
-            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 flex items-center justify-center gap-3"
+        <div className="flex items-center gap-2 mb-4">
+          <Zap size={20} className="text-amber-500" />
+          <h3 className="font-semibold text-slate-800">Venda Rápida</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {products.filter(p => p.is_shortcut).map(product => (
+            <button
+              key={product.id}
+              onClick={() => handleQuickSale(product)}
+              className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-indigo-50 hover:border-indigo-200 transition-all group"
+            >
+              <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-600 text-center">{product.name}</span>
+              <span className="text-xs text-slate-500 font-medium">{formatCurrency(product.price)}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setActiveTab('products')}
+            className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-all"
           >
-            {isSubmitting && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            {cart.length > 0 
-              ? `Finalizar Pedido (${cart.length + (newOrder.product_id ? 1 : 0)} itens)` 
-              : 'Finalizar Pedido'
-            }
+            <PlusCircle size={20} className="mb-1" />
+            <span className="text-xs font-medium">Configurar</span>
           </button>
         </div>
       </div>
+
+      <button 
+        onClick={() => setShowManualOrder(!showManualOrder)}
+        className="w-full py-3 bg-white rounded-xl border border-dashed border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-all flex items-center justify-center gap-2 font-medium"
+      >
+        <PlusCircle size={20} className={showManualOrder ? "rotate-45 transition-transform" : "transition-transform"} />
+        {showManualOrder ? "Recolher Pedido Completo" : "Novo Pedido Completo"}
+      </button>
+
+      {showManualOrder && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h2 className="text-xl font-bold text-slate-900 mb-6">Novo Pedido</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
+              <div className="flex gap-2">
+                <select 
+                  className="flex-1 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                  value={newOrder.customer_id}
+                  onChange={e => setNewOrder({ ...newOrder, customer_id: e.target.value })}
+                  required
+                >
+                  <option value="">Selecionar Cliente</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <button 
+                  type="button"
+                  onClick={() => setShowCustomerModal(true)}
+                  className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
+                >
+                  <UserPlus size={24} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Adicionar Itens</h3>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Produto / Bebida</label>
+                <select 
+                  className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                  value={newOrder.product_id}
+                  onChange={e => setNewOrder({ ...newOrder, product_id: e.target.value })}
+                >
+                  <option value="">Selecionar Item</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.price)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                    value={Number.isNaN(newOrder.quantity) ? "" : newOrder.quantity}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNewOrder({ ...newOrder, quantity: val === "" ? NaN : parseInt(val) });
+                    }}
+                  />
+                </div>
+                <button 
+                  type="button"
+                  onClick={addToCart}
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <PlusCircle size={20} />} Adicionar
+                </button>
+              </div>
+            </div>
+
+            {cart.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Itens no Pedido</h3>
+                <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+                  {cart.map((item, index) => {
+                    const product = products.find(p => p.id === parseInt(item.product_id));
+                    return (
+                      <div key={index} className="p-3 bg-white flex justify-between items-center">
+                        <div>
+                          <div className="font-bold text-slate-900">{product?.name}</div>
+                          <div className="text-xs text-slate-500">{item.quantity}x {formatCurrency(product?.price || 0)}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-slate-900">{formatCurrency((product?.price || 0) * item.quantity)}</span>
+                          <button 
+                            onClick={() => removeFromCart(index)}
+                            className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="p-3 bg-slate-50 flex justify-between items-center font-bold">
+                    <span className="text-slate-700">Total</span>
+                    <span className="text-indigo-600 text-lg">
+                      {formatCurrency(cart.reduce((acc, item) => {
+                        const product = products.find(p => p.id === parseInt(item.product_id));
+                        return acc + (product?.price || 0) * item.quantity;
+                      }, 0))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Horário</label>
+                <input 
+                  type="time" 
+                  className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                  value={newOrder.time}
+                  onChange={e => setNewOrder({ ...newOrder, time: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Observação</label>
+              <textarea 
+                className="w-full rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                rows={2}
+                placeholder="Ex: Sem salada, entregar 11:30"
+                value={newOrder.observation}
+                onChange={e => setNewOrder({ ...newOrder, observation: e.target.value.toUpperCase() })}
+              />
+            </div>
+
+            <button 
+              type="button"
+              onClick={() => handleAddOrder()}
+              disabled={isSubmitting || ((!newOrder.product_id && cart.length === 0) || !newOrder.customer_id)}
+              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 flex items-center justify-center gap-3"
+            >
+              {isSubmitting && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {cart.length > 0 
+                ? `Finalizar Pedido (${cart.length + (newOrder.product_id ? 1 : 0)} itens)` 
+                : 'Finalizar Pedido'
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 

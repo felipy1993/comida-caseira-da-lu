@@ -83,7 +83,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         />
         
         {/* Grid pattern overlay */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03]" />
+        <div className="absolute inset-0 bg-[url('/carbon-fibre.png')] opacity-[0.03]" />
       </div>
 
       <motion.div 
@@ -109,7 +109,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             <div className="absolute inset-0 bg-orange-500/30 rounded-full blur-3xl group-hover:bg-orange-500/50 transition-all duration-700" />
             
             <img 
-              src="https://i.postimg.cc/HWtzDHC3/comidacaseiradalu.png" 
+              src="/comidacaseiradalu.png" 
               alt="Comida Caseira da Lu Logo" 
               className="w-56 h-56 object-contain relative z-10 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] transform group-hover:scale-105 transition-transform duration-500 cursor-default"
             />
@@ -237,7 +237,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
             <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Desenvolvido por</span>
             <img 
-              src="https://i.postimg.cc/5N7ptFSk/logo-dev.png" 
+              src="/logo-dev.png" 
               alt="Developer Logo" 
               className="h-6 object-contain"
             />
