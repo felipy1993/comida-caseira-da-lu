@@ -1775,7 +1775,7 @@ export default function App() {
           />
           <h1 className="text-xl font-black text-slate-800 tracking-tight leading-tight text-center">COMIDA CASEIRA<br/>DA LU</h1>
         </div>
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
           <NavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Dashboard" />
           <NavItem active={activeTab === 'new-order'} onClick={() => setActiveTab('new-order')} icon={<PlusCircle size={20}/>} label="Novo Pedido" />
           <NavItem active={activeTab === 'orders'} onClick={() => setActiveTab('orders')} icon={<ClipboardList size={20}/>} label="Pedidos" />
