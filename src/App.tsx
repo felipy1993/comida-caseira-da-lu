@@ -9,6 +9,7 @@ import {
   Download,
   Trash2,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   TrendingUp,
@@ -110,6 +111,12 @@ export default function App() {
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const changeDate = (days: number) => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    setSelectedDate(d.toISOString().split('T')[0]);
   };
 
 
@@ -549,17 +556,29 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-slate-900">Visão Geral</h2>
-          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+            <button 
+              onClick={() => changeDate(-1)}
+              className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
             <input 
               type="date" 
-              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium"
+              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium bg-transparent"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
             />
+            <button 
+              onClick={() => changeDate(1)}
+              className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
             {selectedDate !== today && (
               <button 
                 onClick={() => setSelectedDate(today)}
-                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
+                className="ml-1 text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
               >
                 Hoje
               </button>
@@ -1128,17 +1147,29 @@ export default function App() {
             <div className="text-sm text-slate-500">{groupedOrdersArray.length} pedidos ({orders.length} itens)</div>
           </div>
           
-          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+            <button 
+              onClick={() => changeDate(-1)}
+              className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
             <input 
               type="date" 
-              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium"
+              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium bg-transparent"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
             />
+            <button 
+              onClick={() => changeDate(1)}
+              className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
             {selectedDate !== today && (
               <button 
                 onClick={() => setSelectedDate(today)}
-                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
+                className="ml-1 text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
               >
                 Hoje
               </button>
@@ -1292,13 +1323,25 @@ export default function App() {
           <h3 className="font-semibold text-slate-800">
             {selectedDate === today ? 'Gastos de Hoje' : `Gastos - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}`}
           </h3>
-          <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-100">
+          <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-100">
+            <button 
+              onClick={() => changeDate(-1)}
+              className="p-1 hover:bg-white rounded-md text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronLeft size={14} />
+            </button>
             <input 
               type="date" 
               className="text-xs border-none focus:ring-0 p-0.5 bg-transparent text-slate-600 font-medium"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
             />
+            <button 
+              onClick={() => changeDate(1)}
+              className="p-1 hover:bg-white rounded-md text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
         <div className="divide-y divide-slate-50">
@@ -1339,17 +1382,29 @@ export default function App() {
           <h2 className="text-xl font-bold text-slate-900">
             {selectedDate === today ? 'Relatório de Hoje' : `Relatório - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}`}
           </h2>
-          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+            <button 
+              onClick={() => changeDate(-1)}
+              className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
             <input 
               type="date" 
-              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium"
+              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium bg-transparent"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
             />
+            <button 
+              onClick={() => changeDate(1)}
+              className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
             {selectedDate !== today && (
               <button 
                 onClick={() => setSelectedDate(today)}
-                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
+                className="ml-1 text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
               >
                 Hoje
               </button>
