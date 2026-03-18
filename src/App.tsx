@@ -82,6 +82,7 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [monthlyStats, setMonthlyStats] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(today);
 
 
   // Form states
@@ -124,7 +125,7 @@ export default function App() {
     if (user) {
       fetchData();
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, selectedDate]);
 
   useEffect(() => {
     if (activeTab === 'monthly-report') {
@@ -191,8 +192,8 @@ export default function App() {
       const [productsSnap, customersSnap, ordersSnap, expensesSnap, logsSnap] = await Promise.all([
         getDocs(query(collection(db, 'products'), orderBy('name', 'asc'))),
         getDocs(query(collection(db, 'customers'), orderBy('name', 'asc'))),
-        getDocs(query(collection(db, 'orders'), where('date', '==', today))),
-        getDocs(query(collection(db, 'expenses'), where('date', '==', today))),
+        getDocs(query(collection(db, 'orders'), where('date', '==', selectedDate))),
+        getDocs(query(collection(db, 'expenses'), where('date', '==', selectedDate))),
         getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)))
       ]);
 
@@ -545,8 +546,26 @@ export default function App() {
 
   const renderDashboard = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-slate-900">Visão Geral</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-slate-900">Visão Geral</h2>
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <input 
+              type="date" 
+              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+            {selectedDate !== today && (
+              <button 
+                onClick={() => setSelectedDate(today)}
+                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
           Backend Online
@@ -698,7 +717,7 @@ export default function App() {
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <PieChartIcon size={18} className="text-indigo-600" />
-              Hoje
+              {selectedDate === today ? 'Hoje' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}
             </h3>
           </div>
           <div className="flex-1 min-h-[200px] w-full flex items-center justify-center">
@@ -709,7 +728,7 @@ export default function App() {
               ].filter(d => d.value > 0);
 
               if (pieData.length === 0) {
-                return <div className="text-sm text-slate-400">Nenhum dado hoje</div>;
+                return <div className="text-sm text-slate-400">Nenhum dado nesta data</div>;
               }
 
               return (
@@ -787,7 +806,7 @@ export default function App() {
             </div>
           ))}
           {orders.length === 0 && (
-            <div className="p-8 text-center text-slate-400">Nenhum pedido hoje</div>
+            <div className="p-8 text-center text-slate-400">Nenhum pedido nesta data</div>
           )}
         </div>
       </div>
@@ -1101,9 +1120,30 @@ export default function App() {
 
     return (
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-slate-900">Pedidos de Hoje</h2>
-          <div className="text-sm text-slate-500">{groupedOrdersArray.length} pedidos ({orders.length} itens)</div>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-900">
+              {selectedDate === today ? 'Pedidos de Hoje' : `Pedidos - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}`}
+            </h2>
+            <div className="text-sm text-slate-500">{groupedOrdersArray.length} pedidos ({orders.length} itens)</div>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <input 
+              type="date" 
+              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+            {selectedDate !== today && (
+              <button 
+                onClick={() => setSelectedDate(today)}
+                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
         </div>
         
         <div className="grid gap-4">
@@ -1199,7 +1239,7 @@ export default function App() {
           {groupedOrdersArray.length === 0 && (
             <div className="py-20 text-center">
               <div className="text-slate-300 mb-2"><ClipboardList size={48} className="mx-auto" /></div>
-              <p className="text-slate-500">Nenhum pedido registrado hoje.</p>
+              <p className="text-slate-500">Nenhum pedido registrado nesta data.</p>
             </div>
           )}
         </div>
@@ -1248,8 +1288,18 @@ export default function App() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-50">
-          <h3 className="font-semibold text-slate-800">Gastos de Hoje</h3>
+        <div className="p-4 border-b border-slate-50 flex justify-between items-center">
+          <h3 className="font-semibold text-slate-800">
+            {selectedDate === today ? 'Gastos de Hoje' : `Gastos - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}`}
+          </h3>
+          <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-100">
+            <input 
+              type="date" 
+              className="text-xs border-none focus:ring-0 p-0.5 bg-transparent text-slate-600 font-medium"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
         </div>
         <div className="divide-y divide-slate-50">
           {expenses.map(expense => (
@@ -1284,11 +1334,31 @@ export default function App() {
 
   const renderReport = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-slate-900">Relatório do Dia</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-slate-900">
+            {selectedDate === today ? 'Relatório de Hoje' : `Relatório - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}`}
+          </h2>
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <input 
+              type="date" 
+              className="text-sm border-none focus:ring-0 p-1 text-slate-600 font-medium"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+            {selectedDate !== today && (
+              <button 
+                onClick={() => setSelectedDate(today)}
+                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+        </div>
         <button 
           onClick={exportCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors ml-auto sm:ml-0"
         >
           <Download size={16} /> Exportar CSV
         </button>
